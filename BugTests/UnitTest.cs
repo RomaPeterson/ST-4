@@ -4,184 +4,218 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace BugTests;
 
 [TestClass]
-public class BugTests
+public class BugWorkflowTests
 {
     private Bug? _bug;
 
     [TestInitialize]
-    public void SetUp()
+    public void BeforeEach()
     {
         _bug = new Bug();
     }
 
     [TestMethod]
-    public void InitialState_ShouldBeNewDefect()
+    public void Initial_IsCreated()
     {
-        Assert.AreEqual(Bug.State.NewDefect, _bug!.CurrentState);
+        Assert.AreEqual(Bug.State.Created, _bug!.GetState());
     }
 
     [TestMethod]
-    public void StartTriage_FromNewDefect_TransitionsToTriage()
+    public void Created_Accept_BecomesAccepted()
     {
-        _bug!.StartTriage();
-        Assert.AreEqual(Bug.State.Triage, _bug.CurrentState);
+        _bug!.Accept();
+        Assert.AreEqual(Bug.State.Accepted, _bug.GetState());
     }
 
     [TestMethod]
-    public void NoTime_FromTriage_TransitionsToFix()
+    public void Accepted_StartWork_BecomesWorking()
     {
-        _bug!.StartTriage();
-        _bug.NoTime();
-        Assert.AreEqual(Bug.State.Fix, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        Assert.AreEqual(Bug.State.Working, _bug.GetState());
     }
 
     [TestMethod]
-    public void NeedSeparateSolution_FromTriage_TransitionsToFix()
+    public void Accepted_Finish_BecomesDone()
     {
-        _bug!.StartTriage();
-        _bug.NeedSeparateSolution();
-        Assert.AreEqual(Bug.State.Fix, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.Finish();
+        Assert.AreEqual(Bug.State.Done, _bug.GetState());
     }
 
     [TestMethod]
-    public void OtherProduct_FromTriage_TransitionsToClosed()
+    public void Working_CompleteFix_BecomesFixed()
     {
-        _bug!.StartTriage();
-        _bug.OtherProduct();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        _bug.CompleteFix();
+        Assert.AreEqual(Bug.State.Fixed, _bug.GetState());
     }
 
     [TestMethod]
-    public void NeedMoreInfo_FromTriage_StaysInTriage()
+    public void Working_Finish_BecomesDone()
     {
-        _bug!.StartTriage();
-        _bug.NeedMoreInfo();
-        Assert.AreEqual(Bug.State.Triage, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        _bug.Finish();
+        Assert.AreEqual(Bug.State.Done, _bug.GetState());
     }
 
     [TestMethod]
-    public void FixDone_FromFix_TransitionsToClosed()
+    public void Fixed_Finish_BecomesDone()
     {
-        _bug!.StartTriage();
-        _bug.NeedSeparateSolution();
-        _bug.FixDone();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        _bug.CompleteFix();
+        _bug.Finish();
+        Assert.AreEqual(Bug.State.Done, _bug.GetState());
     }
 
     [TestMethod]
-    public void NotDefect_FromFix_TransitionsToClosed()
+    public void Fixed_Return_BecomesReturned()
     {
-        _bug!.StartTriage();
-        _bug.NeedSeparateSolution();
-        _bug.NotDefect();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        _bug.CompleteFix();
+        _bug.Return();
+        Assert.AreEqual(Bug.State.Returned, _bug.GetState());
     }
 
     [TestMethod]
-    public void DoNotFix_FromFix_TransitionsToClosed()
+    public void Done_Return_BecomesReturned()
     {
-        _bug!.StartTriage();
-        _bug.NeedSeparateSolution();
-        _bug.DoNotFix();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.Finish();
+        _bug.Return();
+        Assert.AreEqual(Bug.State.Returned, _bug.GetState());
     }
 
     [TestMethod]
-    public void Duplicate_FromFix_TransitionsToClosed()
+    public void Returned_Accept_BecomesAccepted()
     {
-        _bug!.StartTriage();
-        _bug.NeedSeparateSolution();
-        _bug.Duplicate();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.Finish();
+        _bug.Return();
+        _bug.Accept();
+        Assert.AreEqual(Bug.State.Accepted, _bug.GetState());
     }
 
     [TestMethod]
-    public void NotReproducible_FromFix_TransitionsToClosed()
+    public void Returned_Finish_BecomesDone()
     {
-        _bug!.StartTriage();
-        _bug.NeedSeparateSolution();
-        _bug.NotReproducible();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.Finish();
+        _bug.Return();
+        _bug.Finish();
+        Assert.AreEqual(Bug.State.Done, _bug.GetState());
     }
 
     [TestMethod]
-    public void Reopen_FromClosed_TransitionsToReopened()
+    public void FullWorkflow_AllSteps()
     {
-        _bug!.StartTriage();
-        _bug.OtherProduct();
-        _bug.Reopen();
-        Assert.AreEqual(Bug.State.Reopened, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        _bug.CompleteFix();
+        _bug.Finish();
+        _bug.Return();
+        Assert.AreEqual(Bug.State.Returned, _bug.GetState());
     }
 
     [TestMethod]
-    public void Reopen_FromFix_TransitionsToReopened()
+    public void Return_OnReturned_Ignored()
     {
-        _bug!.StartTriage();
-        _bug.NoTime();
-        _bug.Reopen();
-        Assert.AreEqual(Bug.State.Reopened, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.Finish();
+        _bug.Return();
+        _bug.Return();
+        Assert.AreEqual(Bug.State.Returned, _bug.GetState());
     }
 
     [TestMethod]
-    public void StartTriage_FromReopened_TransitionsToTriage()
+    public void Finish_OnDone_Ignored()
     {
-        _bug!.StartTriage();
-        _bug.OtherProduct();
-        _bug.Reopen();
-        _bug.StartTriage();
-        Assert.AreEqual(Bug.State.Triage, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.Finish();
+        _bug.Finish();
+        Assert.AreEqual(Bug.State.Done, _bug.GetState());
     }
 
     [TestMethod]
-    public void FixDone_FromReopened_TransitionsToClosed()
+    public void StartWork_FromCreated_Throws()
     {
-        _bug!.StartTriage();
-        _bug.NoTime();
-        _bug.Reopen();
-        _bug.FixDone();
-        Assert.AreEqual(Bug.State.Closed, _bug.CurrentState);
+        var ex = Assert.ThrowsException<InvalidOperationException>(() => _bug!.StartWork());
+        Assert.IsNotNull(ex);
     }
 
     [TestMethod]
-    public void NoTime_FromNewDefect_ThrowsException()
+    public void CompleteFix_FromCreated_Throws()
     {
-        Assert.ThrowsException<InvalidOperationException>(() => _bug!.NoTime());
+        Assert.ThrowsException<InvalidOperationException>(() => _bug!.CompleteFix());
     }
 
     [TestMethod]
-    public void FixDone_FromTriage_ThrowsException()
+    public void Finish_FromCreated_Throws()
     {
-        _bug!.StartTriage();
-        Assert.ThrowsException<InvalidOperationException>(() => _bug.FixDone());
+        Assert.ThrowsException<InvalidOperationException>(() => _bug!.Finish());
     }
 
     [TestMethod]
-    public void NotDefect_FromNewDefect_ThrowsException()
+    public void Return_FromCreated_Throws()
     {
-        Assert.ThrowsException<InvalidOperationException>(() => _bug!.NotDefect());
+        Assert.ThrowsException<InvalidOperationException>(() => _bug!.Return());
     }
 
     [TestMethod]
-    public void Reopen_FromNewDefect_ThrowsException()
+    public void Accept_FromAccepted_Throws()
     {
-        Assert.ThrowsException<InvalidOperationException>(() => _bug!.Reopen());
+        _bug!.Accept();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.Accept());
     }
 
     [TestMethod]
-    public void Reopen_WhenAlreadyReopened_DoesNotThrow()
+    public void Accept_FromWorking_Throws()
     {
-        _bug!.StartTriage();
-        _bug.OtherProduct();
-        _bug.Reopen();
-        _bug.Reopen();
-        Assert.AreEqual(Bug.State.Reopened, _bug.CurrentState);
+        _bug!.Accept();
+        _bug.StartWork();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.Accept());
     }
 
     [TestMethod]
-    public void StartTriage_WhenAlreadyInTriage_DoesNotThrow()
+    public void CompleteFix_FromAccepted_Throws()
     {
-        _bug!.StartTriage();
-        _bug.StartTriage();
-        Assert.AreEqual(Bug.State.Triage, _bug.CurrentState);
+        _bug!.Accept();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.CompleteFix());
+    }
+
+    [TestMethod]
+    public void Return_FromWorking_Throws()
+    {
+        _bug!.Accept();
+        _bug.StartWork();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.Return());
+    }
+
+    [TestMethod]
+    public void StartWork_FromDone_Throws()
+    {
+        _bug!.Accept();
+        _bug.Finish();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.StartWork());
+    }
+
+    [TestMethod]
+    public void CompleteFix_FromDone_Throws()
+    {
+        _bug!.Accept();
+        _bug.Finish();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.CompleteFix());
+    }
+
+    [TestMethod]
+    public void Accept_FromDone_Throws()
+    {
+        _bug!.Accept();
+        _bug.Finish();
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.Accept());
     }
 }
