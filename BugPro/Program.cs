@@ -4,67 +4,51 @@ namespace BugPro;
 
 public class Bug
 {
-    public enum State { NewDefect, Triage, Fix, Closed, Reopened }
-    public enum Trigger { StartTriage, NoTime, NeedSeparateSolution, OtherProduct, NeedMoreInfo, FixDone, NotDefect, DoNotFix, Duplicate, NotReproducible, VerifyOk, VerifyFailed, Reopen }
+    public enum State { Created, Accepted, Working, Fixed, Done, Returned }
+    public enum Trigger { Accept, StartWork, CompleteFix, Finish, Return }
 
-    private readonly StateMachine<State, Trigger> _machine;
-    private State _currentState;
+    private readonly StateMachine<State, Trigger> _fsm;
+    private State _state;
 
     public Bug()
     {
-        _machine = new StateMachine<State, Trigger>(State.NewDefect);
-        _currentState = State.NewDefect;
+        _fsm = new StateMachine<State, Trigger>(State.Created);
+        _state = State.Created;
 
-        _machine.Configure(State.NewDefect)
-            .Permit(Trigger.StartTriage, State.Triage);
+        _fsm.Configure(State.Created)
+            .Permit(Trigger.Accept, State.Accepted);
 
-        _machine.Configure(State.Triage)
-            .Permit(Trigger.NoTime, State.Fix)
-            .Permit(Trigger.NeedSeparateSolution, State.Fix)
-            .Permit(Trigger.OtherProduct, State.Closed)
-            .Ignore(Trigger.NeedMoreInfo)
-            .Ignore(Trigger.StartTriage) 
-            .Ignore(Trigger.Reopen);
+        _fsm.Configure(State.Accepted)
+            .Permit(Trigger.StartWork, State.Working)
+            .Permit(Trigger.Finish, State.Done);
 
-        _machine.Configure(State.Fix)
-            .Permit(Trigger.FixDone, State.Closed)
-            .Permit(Trigger.NotDefect, State.Closed)
-            .Permit(Trigger.DoNotFix, State.Closed)
-            .Permit(Trigger.Duplicate, State.Closed)
-            .Permit(Trigger.NotReproducible, State.Closed)
-            .Permit(Trigger.Reopen, State.Reopened);
+        _fsm.Configure(State.Working)
+            .Permit(Trigger.CompleteFix, State.Fixed)
+            .Permit(Trigger.Finish, State.Done);
 
-        _machine.Configure(State.Closed)
-            .Permit(Trigger.Reopen, State.Reopened)
-            .Ignore(Trigger.FixDone)
-            .Ignore(Trigger.NotDefect)
-            .Ignore(Trigger.DoNotFix)
-            .Ignore(Trigger.Duplicate)
-            .Ignore(Trigger.NotReproducible);
+        _fsm.Configure(State.Fixed)
+            .Permit(Trigger.Finish, State.Done)
+            .Permit(Trigger.Return, State.Returned);
 
-        _machine.Configure(State.Reopened)
-            .Permit(Trigger.StartTriage, State.Triage)
-            .Ignore(Trigger.Reopen) 
-            .Permit(Trigger.FixDone, State.Closed);
+        _fsm.Configure(State.Done)
+            .Permit(Trigger.Return, State.Returned)
+            .Ignore(Trigger.Finish);
 
-        _machine.OnTransitioned(t => _currentState = t.Destination);
+        _fsm.Configure(State.Returned)
+            .Permit(Trigger.Accept, State.Accepted)
+            .Permit(Trigger.Finish, State.Done)
+            .Ignore(Trigger.Return);
+
+        _fsm.OnTransitioned(t => _state = t.Destination);
     }
 
-    public State CurrentState => _currentState;
+    public State GetState() => _state;
 
-    public void StartTriage() => _machine.Fire(Trigger.StartTriage);
-    public void NoTime() => _machine.Fire(Trigger.NoTime);
-    public void NeedSeparateSolution() => _machine.Fire(Trigger.NeedSeparateSolution);
-    public void OtherProduct() => _machine.Fire(Trigger.OtherProduct);
-    public void NeedMoreInfo() => _machine.Fire(Trigger.NeedMoreInfo);
-    public void FixDone() => _machine.Fire(Trigger.FixDone);
-    public void NotDefect() => _machine.Fire(Trigger.NotDefect);
-    public void DoNotFix() => _machine.Fire(Trigger.DoNotFix);
-    public void Duplicate() => _machine.Fire(Trigger.Duplicate);
-    public void NotReproducible() => _machine.Fire(Trigger.NotReproducible);
-    public void VerifyOk() => _machine.Fire(Trigger.VerifyOk);
-    public void VerifyFailed() => _machine.Fire(Trigger.VerifyFailed);
-    public void Reopen() => _machine.Fire(Trigger.Reopen);
+    public void Accept() => _fsm.Fire(Trigger.Accept);
+    public void StartWork() => _fsm.Fire(Trigger.StartWork);
+    public void CompleteFix() => _fsm.Fire(Trigger.CompleteFix);
+    public void Finish() => _fsm.Fire(Trigger.Finish);
+    public void Return() => _fsm.Fire(Trigger.Return);
 }
 
 public static class Program
@@ -72,33 +56,29 @@ public static class Program
     public static void Main()
     {
         var bug = new Bug();
-        Console.WriteLine($"Initial state: {bug.CurrentState}");
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.StartTriage();
-        Console.WriteLine($"After StartTriage: {bug.CurrentState}");
+        bug.Accept();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.NeedSeparateSolution();
-        Console.WriteLine($"After NeedSeparateSolution: {bug.CurrentState}");
+        bug.StartWork();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.FixDone();
-        Console.WriteLine($"After FixDone: {bug.CurrentState}");
+        bug.CompleteFix();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.Reopen();
-        Console.WriteLine($"After Reopen: {bug.CurrentState}");
+        bug.Finish();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.StartTriage();
-        Console.WriteLine($"After StartTriage from Reopened: {bug.CurrentState}");
+        bug.Return();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.NeedSeparateSolution();
-        Console.WriteLine($"After NeedSeparateSolution: {bug.CurrentState}");
+        bug.Accept();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        bug.FixDone();
-        Console.WriteLine($"After FixDone: {bug.CurrentState}");
+        bug.Finish();
+        Console.WriteLine($"State: {bug.GetState()}");
 
-        var bug2 = new Bug();
-        bug2.StartTriage();
-        bug2.NeedSeparateSolution();
-        bug2.NotDefect();
-        Console.WriteLine($"Bug2 after NotDefect: {bug2.CurrentState}");
+        Console.WriteLine("Done.");
     }
 }
